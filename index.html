@@ -310,54 +310,79 @@ window.LP_CONFIG = {
 
 <script>
 (function(){
-  var cfg = window.LP_CONFIG || {};
+  function init(){
+    var cfg = window.LP_CONFIG || {};
 
-  function downloadDeck(){
-    // data: URL は download 属性のファイル名を無視することがあるため Blob 経由にする
-    var b64 = window.DECK_DATA.split(',')[1];
-    var bin = atob(b64);
-    var buf = new Uint8Array(bin.length);
-    for (var i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
-    var url = URL.createObjectURL(new Blob([buf], {type:'application/octet-stream'}));
-    var a = document.createElement('a');
-    a.href = url;
-    a.download = 'minpo-ch5-joubun-257.apkg';
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
-  }
-
-  // 「今すぐダウンロード」ボタン
-  document.querySelectorAll('[data-download]').forEach(function(b){
-    b.addEventListener('click', function(e){ e.preventDefault(); downloadDeck(); });
-  });
-
-  var form = document.getElementById('signup-form');
-  if(!form) return;
-  form.addEventListener('submit', function(e){
-    e.preventDefault();
-    var msg = document.getElementById('form-msg');
-    if(!cfg.FORM_ENDPOINT){
-      msg.textContent = '送信先が未設定です。lp.html の LP_CONFIG.FORM_ENDPOINT を設定してください。デッキのダウンロードは下のボタンから今すぐできます。';
-      msg.style.color = '#d03b3b';
-      return;
+    function downloadDeck(){
+      var b64 = window.DECK_DATA.split(',')[1];
+      var bin = atob(b64);
+      var buf = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+      var url = URL.createObjectURL(new Blob([buf], {type:'application/octet-stream'}));
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = 'minpo-ch5-joubun-257.apkg';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
     }
-    var fd = new FormData();
-    fd.append(cfg.FORM_FIELD_EMAIL, form.email.value);
-    fd.append(cfg.FORM_FIELD_EXAM, form.exam.value);
-    msg.style.color = '';
-    msg.textContent = '送信中…';
-    fetch(cfg.FORM_ENDPOINT, {method:'POST', body:fd, mode:'no-cors'})
-      .then(function(){
-        msg.textContent = 'ありがとうございます。デッキのダウンロードを開始します。';
+    window.__downloadDeck = downloadDeck;
+
+    var dl = document.querySelectorAll('[data-download]');
+    for (var i = 0; i < dl.length; i++) {
+      dl[i].addEventListener('click', function(e){ e.preventDefault(); downloadDeck(); });
+    }
+
+    var form = document.getElementById('signup-form');
+    if (!form) { window.__LP_READY = 'no-form'; return; }
+
+    // 送信は隠しiframeへのGET。CORSを一切踏まないので確実に通る。
+    var frame = document.createElement('iframe');
+    frame.name = 'lp_sink';
+    frame.style.display = 'none';
+    document.body.appendChild(frame);
+
+    form.addEventListener('submit', function(e){
+      e.preventDefault();
+      var msg = document.getElementById('form-msg');
+      var email = form.email.value.trim();
+      if (!cfg.FORM_ENDPOINT) {
+        msg.style.color = '#d03b3b';
+        msg.textContent = '送信先が未設定です。下のリンクから直接ダウンロードできます。';
+        return;
+      }
+      var exam = '';
+      for (var j = 0; j < form.exam.length; j++) { if (form.exam[j].checked) exam = form.exam[j].value; }
+
+      msg.style.color = '';
+      msg.textContent = '送信中…';
+
+      var url = cfg.FORM_ENDPOINT
+        + '?' + encodeURIComponent(cfg.FORM_FIELD_EMAIL) + '=' + encodeURIComponent(email)
+        + '&' + encodeURIComponent(cfg.FORM_FIELD_EXAM) + '=' + encodeURIComponent(exam)
+        + '&submit=Submit';
+
+      var done = false;
+      function finish(){
+        if (done) return;
+        done = true;
         msg.style.color = '#0ca30c';
+        msg.textContent = 'ありがとうございます。デッキのダウンロードを開始します。';
         downloadDeck();
         form.reset();
-      })
-      .catch(function(){
-        msg.textContent = '送信に失敗しました。時間をおいて試してください。';
-        msg.style.color = '#d03b3b';
-      });
-  });
+      }
+      frame.onload = finish;
+      setTimeout(finish, 2500);
+      frame.src = url;
+    });
+
+    window.__LP_READY = true;
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
 })();
 </script>
 
