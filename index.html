@@ -313,7 +313,24 @@ window.LP_CONFIG = {
   function init(){
     var cfg = window.LP_CONFIG || {};
 
+    // 直接ダウンロードは今まで一切記録されていなかった。
+    // メール登録せずに落とす人のほうが多いはずなので、それが見えないと判定を誤る。
+    // 同じGoogleフォームに、試験欄を「（ダウンロードのみ）」として1行入れる。
+    var counted = false;
+    function countDownload(){
+      if (counted || !cfg.FORM_ENDPOINT) return;
+      counted = true;
+      var f = document.createElement('iframe');
+      f.style.display = 'none';
+      f.src = cfg.FORM_ENDPOINT
+        + '?' + encodeURIComponent(cfg.FORM_FIELD_EMAIL) + '='
+        + '&' + encodeURIComponent(cfg.FORM_FIELD_EXAM) + '=' + encodeURIComponent('（ダウンロードのみ）')
+        + '&submit=Submit';
+      document.body.appendChild(f);
+    }
+
     function downloadDeck(){
+      countDownload();
       var b64 = window.DECK_DATA.split(',')[1];
       var bin = atob(b64);
       var buf = new Uint8Array(bin.length);
